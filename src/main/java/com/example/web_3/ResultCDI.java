@@ -72,7 +72,4 @@ public class ResultCDI implements Serializable {
     public List<Result> getAllResults(){
         return resultEJB.getAllResults();
     }
-
-
-    //TODO создать лист result, метод где создается новый обьект этот метод кнопка отправить
 }

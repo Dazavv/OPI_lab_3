@@ -1,0 +1,366 @@
+<project name="web_3" default="build">
+    <property file="build.properties"/>
+
+    <path id="classpath">
+        <fileset dir="${lib.dir}" includes="*.jar"/>
+        <fileset dir="${main.dir}" includes="*.java"/>
+    </path>
+
+    <path id="classpath.test">
+        <pathelement location="${junit}"/>
+        <pathelement location="${hamcrest}"/>
+        <pathelement location="${classes.dir}"/>
+    </path>
+
+    <taskdef resource="net/sf/antcontrib/antcontrib.properties">
+        <classpath>
+            <pathelement location="${contrib}"/>
+        </classpath>
+    </taskdef>
+    <taskdef resource="net/sf/antcontrib/antlib.xml">
+        <classpath>
+            <pathelement location="${contrib}"/>
+        </classpath>
+    </taskdef>
+
+    <target name="compile" depends="clean">
+        <echo message="***** COMPILE STARTED *****"/>
+        <mkdir dir="${classes.dir}"/>
+        <mkdir dir="${test.classes.dir}"/>
+        <javac srcdir="${src.dir}" destdir="${classes.dir}" classpathref="classpath" includeantruntime="false"/>
+        <echo message="***** COMPILE COMPLETED *****"/>
+    </target>
+
+    <target name="build" depends="compile">
+        <echo message="***** BUILD STARTED *****"/>
+        <copy todir="${build.dir}">
+            <fileset dir="${web.dir}"/>
+        </copy>
+        <copy todir="${build.dir.lib}">
+            <fileset dir="${lib.dir}"/>
+        </copy>
+        <copy todir="${classes.dir}">
+            <fileset dir="${resources.dir}"/>
+        </copy>
+
+        <jar destfile="${build.dir}/${ant.project.name}.jar">
+            <fileset dir="${classes.dir}"/>
+            <manifest>
+                <attribute name="Created-By" value="Dasha"/>
+                <attribute name="Manifest-Version" value="1.0"/>
+                <attribute name="Main-Class" value="NoClass"/>
+            </manifest>
+        </jar>
+
+        <war destfile="${build.dir}/${ant.project.name}.war" webxml="${build.web.xml}">
+            <fileset dir="${build.dir}"/>
+            <manifest>
+                <attribute name="Created-By" value="Dasha"/>
+                <attribute name="Manifest-Version" value="1.0"/>
+                <attribute name="Main-Class" value="NoClass"/>
+            </manifest>
+        </war>
+
+        <echo message="***** BUILD COMPLETED *****"/>
+    </target>
+
+    <target name="clean">
+        <echo message="***** CLEAN STARTED *****"/>
+        <delete dir="${build.dir}"/>
+        <delete dir="${junit.report.dir}"/>
+        <echo message="***** CLEAN COMPLETED *****"/>
+    </target>
+
+    <target name="test" depends="build">
+        <echo message="***** TEST STARTED *****"/>
+        <mkdir dir="${test.classes.dir}"/>
+        <mkdir dir="${junit.report.dir}"/>
+        <javac destdir="${test.classes.dir}" srcdir="${test.dir}" includeantruntime="false" encoding="utf-8">
+            <classpath refid="classpath.test"/>
+        </javac>
+        <junit printsummary="on" haltonfailure="true" haltonerror="true">
+            <classpath>
+                <path refid="classpath.test"/>
+                <pathelement location="${test.classes.dir}"/>
+            </classpath>
+            <batchtest fork="yes" todir="${junit.report.dir}">
+                <formatter type="xml"/>
+                <fileset dir="${test.dir}" includes="*Test.java"/>
+            </batchtest>
+        </junit>
+        <echo message="***** TEST COMPLETED *****"/>
+    </target>
+
+    <target name="xml">
+        <echo message="***** XML STARTED *****"/>
+        <echo>XML project files validation...</echo>
+        <xmlvalidate lenient="true">
+            <fileset dir="./" includes="**/*.xml">
+                <exclude name=".idea/**"/>
+            </fileset>
+        </xmlvalidate>
+        <echo message="***** XML COMPLETED *****"/>
+    </target>
+
+    <target name="music" depends="build">
+        <echo message="***** MUSIC DONE *****"/>
+        <exec executable="cmd">
+            <arg value="/c"/>
+            <arg value="${musicPlayer} ${music}"/>
+            <arg value="-p"/>
+        </exec>
+    </target>
+
+    <target name="native2ascii">
+        <echo message="***** NATIVE2ASCII STARTED *****"/>
+        <delete dir="${native2ascii.resources}"/>
+        <native2ascii src="${resources.dir}"
+                      dest="${native2ascii.resources}"
+                      includes="**/*.properties"/>
+        <echo message="***** NATIVE2ASCII COMPLETED *****"/>
+    </target>
+
+
+    <target name="doc" depends="build">
+        <fileset dir="${build.dir}" id="files.to.process"/>
+        <for param="file">
+            <path>
+                <fileset refid="files.to.process"/>
+            </path>
+            <sequential>
+                <checksum algorithm="md5" property="@{file}.md5">
+                    <file name="@{file}"/>
+                </checksum>
+                <checksum algorithm="sha1" property="@{file}.sha1">
+                    <file name="@{file}"/>
+                </checksum>
+                <pathconvert property="@{file}.relative">
+                    <path location="@{file}"/>
+                    <globmapper from="${basedir}/*" to="*" />
+                </pathconvert>
+                <manifest file="${manifest.file}" mode="update">
+                    <section name="${@{file}.relative}">
+                        <attribute name="MD5-Digest" value="${@{file}.md5}"/>
+                        <attribute name="SHA1-Digest" value="${@{file}.sha1}"/>
+                    </section>
+                </manifest>
+            </sequential>
+        </for>
+
+        <mkdir dir="${javadoc.dir}/javadoc"/>
+        <javadoc destdir="${javadoc.dir}/javadoc">
+            <classpath refid="classpath"/>
+            <classpath refid="test.classpath"/>
+            <fileset dir="${src.dir}" includes="**/*.java"/>
+        </javadoc>
+        <war destfile="${build.dir}/${ant.project.name}.war" update="true">
+            <fileset dir="${javadoc.dir}"/>
+        </war>
+    </target>
+
+    <target name="team">
+        <exec executable="git" failonerror="true">
+            <arg value="stash"/>
+        </exec>
+        <exec executable="git" outputproperty="current.commit" failonerror="true">
+            <arg value="rev-parse"/>
+            <arg value="HEAD"/>
+        </exec>
+        <exec executable="git" outputproperty="current.branch" failonerror="true">
+            <arg value="rev-parse"/>
+            <arg value="--abbrev-ref"/>
+            <arg value="HEAD"/>
+        </exec>
+        <property name="revision1" value="${current.commit}~1"/>
+        <property name="revision2" value="${current.commit}~2"/>
+
+        <exec executable="git" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="${revision1}"/>
+        </exec>
+        <antcall target="build">
+            <param name="war.file" value="${build.dir}/${ant.project.name}_${revision1}.war"/>
+        </antcall>
+
+        <exec executable="git" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="${revision2}"/>
+        </exec>
+        <antcall target="build">
+            <param name="war.file" value="${build.dir}/${ant.project.name}_${revision2}.war"/>
+        </antcall>
+
+        <zip destfile="${build.dir}/prev-revisions.zip">
+            <fileset dir="${build.dir}">
+                <include name="${ant.project.name}_${revision1}.war"/>
+                <include name="${ant.project.name}_${revision2}.war"/>
+            </fileset>
+        </zip>
+
+        <exec executable="git" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="${current.branch}"/>
+        </exec>
+        <exec executable="git" failonerror="false">
+            <arg value="stash"/>
+            <arg value="pop"/>
+        </exec>
+    </target>
+
+    <target name="diff" >
+        <echo message="***** DIFF STARTED *****"/>
+        <loadfile property="params" srcFile="params.props"/>
+        <exec executable="git" outputproperty="differences">
+            <arg value="diff"/>
+            <arg value="--name-only"/>
+        </exec>
+        <property name="commit.flag" value="false"/>
+        <script language="javascript">
+            var diffs = project.getProperty("differences").split("\n");
+            var params = project.getProperty("params").split("\n");
+            var echo = project.createTask("echo");
+
+            var flag = false;
+            for (var i=0; i&lt;params.length; i++) {
+            for (var j=0; j&lt;diffs.length; j++) {
+            if (params[i] === diffs[j]) {
+            echo.setMessage("*** CHANGED FILE FOUND: " + params[i] + " ***");
+            echo.perform();
+
+            project.setProperty("commit.flag", "true");
+            flag = true;
+            break;
+            }
+            }
+            if (flag) break;
+            }
+        </script>
+        <if>
+            <equals arg1="${commit.flag}" arg2="true"/>
+            <then>
+                <echo message="*** FILES FROM PARAMS CHANGED, COMMITING... ***"/>
+                <exec executable="git">
+                    <arg value="add"/>
+                    <arg value="*"/>
+                </exec>
+                <exec executable="git">
+                    <arg value="commit"/>
+                    <arg value="-m"/>
+                    <arg value="feat: :sparkles: some shit added (auto-commit)"/>
+                </exec>
+            </then>
+            <else>
+                <echo message="*** FILES FROM PARAMS NOT CHANGED ***"/>
+            </else>
+        </if>
+        <echo message="***** DIFF COMPLETED *****"/>
+    </target>
+
+
+    <target name="report" depends="test">
+        <echo message="***** REPORT STARTED *****"/>
+
+        <condition property="tests.successful">
+            <not>
+                <isset property="tests.failed" />
+            </not>
+        </condition>
+
+        <if>
+            <isset property="tests.successful" />
+            <then>
+                <junitreport todir="${junit.report.dir}">
+                    <fileset dir="${junit.report.dir}" includes="TEST-*.xml" />
+                    <report todir="${junit.report.dir}" />
+                </junitreport>
+
+                <move todir="${git.dir}">
+                    <fileset dir="${junit.report.dir}" includes="TESTS-*.xml"/>
+                </move>
+
+                <exec executable="git">
+                    <arg value="add" />
+                    <arg value="${git.dir}/*" />
+                </exec>
+                <exec executable="git">
+                    <arg value="update" />
+                    <arg value="${git.dir}"/>
+                </exec>
+                <exec executable="git">
+                    <arg value="commit" />
+                    <arg value="${git.dir}"/>
+                    <arg value="-m" />
+                    <arg value="Update report" />
+                </exec>
+            </then>
+            <else>
+                <echo message="Tests were not successful. Skipping report generation." />
+            </else>
+        </if>
+        <echo message="***** REPORT COMPLETED *****"/>
+    </target>
+
+
+
+
+    <target name="history">
+        <exec executable="git" failonerror="true">
+            <arg value="stash"/>
+        </exec>
+        <exec executable="git" outputproperty="current.commit" failonerror="true">
+            <arg value="rev-parse"/>
+            <arg value="HEAD"/>
+        </exec>
+        <exec executable="git" outputproperty="current.branch" failonerror="true">
+            <arg value="rev-parse"/>
+            <arg value="--abbrev-ref"/>
+            <arg value="HEAD"/>
+        </exec>
+        <exec executable="git" outputproperty="commits.list">
+            <arg line="rev-list"/>
+            <arg line="HEAD"/>
+        </exec>
+
+        <for param="commit" list="${commits.list}" delimiter="&#10;" keepgoing="true">
+            <sequential>
+                <if>
+                    <not>
+                        <isset property="revision.compiled"/>
+                    </not>
+                    <then>
+                        <trycatch>
+                            <try>
+                                <echo message="&#10;Checkout revision @{commit}&#10;&#10;"/>
+                                <exec executable="git" failonerror="true">
+                                    <arg value="checkout"/>
+                                    <arg value="@{commit}"/>
+                                </exec>
+                                <antcall target="compile"/>
+                                <exec executable="git" output="${build.dir}/diff.txt" failonerror="false">
+                                    <arg value="diff"/>
+                                    <arg value="@{commit}"/>
+                                    <arg value="${current.commit}"/>
+                                </exec>
+                                <echo message="&#10;Revision @{commit} compiled successfully&#10;&#10;"/>
+                                <property name="revision.compiled" value="true"/>
+                            </try>
+                            <catch>
+                                <echo message="&#10;Error compiling revision @{commit}&#10;"/>
+                            </catch>
+                        </trycatch>
+                    </then>
+                </if>
+            </sequential>
+        </for>
+
+        <exec executable="git" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="${current.branch}"/>
+        </exec>
+        <exec executable="git" failonerror="false">
+            <arg value="stash"/>
+            <arg value="pop"/>
+        </exec>
+    </target>
+
+</project>
