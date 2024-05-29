@@ -103,19 +103,21 @@
     </target>
 
     <target name="music" depends="build">
-        <echo message="***** MUSIC DONE *****"/>
+        <echo message="***** PLAYING MUSIC *****"/>
         <exec executable="cmd">
             <arg value="/c"/>
-            <arg value="${musicPlayer} ${music}"/>
-            <arg value="-p"/>
+            <arg value="start"/>
+            <arg value="${music.file}"/>
         </exec>
     </target>
 
     <target name="native2ascii">
         <echo message="***** NATIVE2ASCII STARTED *****"/>
         <delete dir="${native2ascii.resources}"/>
+        <mkdir dir="${native2ascii.resources}"/>
         <native2ascii src="${resources.dir}"
                       dest="${native2ascii.resources}"
+                      encoding="UTF-8"
                       includes="**/*.properties"/>
         <echo message="***** NATIVE2ASCII COMPLETED *****"/>
     </target>
@@ -150,7 +152,7 @@
         <mkdir dir="${javadoc.dir}/javadoc"/>
         <javadoc destdir="${javadoc.dir}/javadoc">
             <classpath refid="classpath"/>
-            <classpath refid="test.classpath"/>
+            <!--            <classpath refid="test.classpath"/>-->
             <fileset dir="${src.dir}" includes="**/*.java"/>
         </javadoc>
         <war destfile="${build.dir}/${ant.project.name}.war" update="true">

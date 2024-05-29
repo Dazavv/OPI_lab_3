@@ -10,17 +10,31 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
-
+/**
+ * EJB для управления результатами.
+ */
 @Stateless
 public class ResultEJB implements Serializable {
     @PersistenceContext(unitName = "ExamplePU")
-
     private EntityManager entityManager;
 
-    public List getAllResults(){
+    /**
+     * Получает все результаты из базы данных.
+     *
+     * @return список всех результатов
+     */
+    public List<Result> getAllResults(){
         return entityManager.createQuery("SELECT r FROM Result r", Result.class).getResultList();
     }
-    public void makeResult(float x,  float y, float r){
+
+    /**
+     * Создает результат проверки.
+     *
+     * @param x координата X
+     * @param y координата Y
+     * @param r радиус области
+     */
+    public void makeResult(float x, float y, float r){
         String currentTime = LocalTime.now().format(DateTimeFormatter.ofPattern("kk:mm:ss"));
         boolean isInside = new CheckResult().check(x, y, r);
 
@@ -33,6 +47,9 @@ public class ResultEJB implements Serializable {
         loadResult(res);
     }
 
+    /**
+     * Создает результат проверки из параметров SVG.
+     */
     public void makeResultFromSVG() {
         try {
             float x = 0f;
@@ -56,16 +73,20 @@ public class ResultEJB implements Serializable {
         }
     }
 
+    /**
+     * Удаляет все данные из базы данных.
+     */
     public void deleteData(){
         entityManager.createQuery("DELETE FROM Result").executeUpdate();
     }
 
+    /**
+     * Сохраняет результат в базе данных.
+     *
+     * @param res результат для сохранения
+     */
     public void loadResult(Result res){
         entityManager.persist(res);
         entityManager.flush();
     }
-
-    //метод для проверки и создания нового обьекта
-
-
 }
