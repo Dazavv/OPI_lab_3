@@ -1,4 +1,4 @@
-<project name="web_3" default="build">
+﻿<project name="web_3" default="build">
     <property file="build.properties"/>
 
     <path id="classpath">
@@ -26,7 +26,6 @@
     <target name="compile" depends="clean">
         <echo message="***** COMPILE STARTED *****"/>
         <mkdir dir="${classes.dir}"/>
-        <mkdir dir="${test.classes.dir}"/>
         <javac srcdir="${src.dir}" destdir="${classes.dir}" classpathref="classpath" includeantruntime="false"/>
         <echo message="***** COMPILE COMPLETED *****"/>
     </target>
@@ -51,15 +50,6 @@
                 <attribute name="Main-Class" value="NoClass"/>
             </manifest>
         </jar>
-
-        <war destfile="${build.dir}/${ant.project.name}.war" webxml="${build.web.xml}">
-            <fileset dir="${build.dir}"/>
-            <manifest>
-                <attribute name="Created-By" value="Dasha"/>
-                <attribute name="Manifest-Version" value="1.0"/>
-                <attribute name="Main-Class" value="NoClass"/>
-            </manifest>
-        </war>
 
         <echo message="***** BUILD COMPLETED *****"/>
     </target>
@@ -93,7 +83,6 @@
 
     <target name="xml">
         <echo message="***** XML STARTED *****"/>
-        <echo>XML project files validation...</echo>
         <xmlvalidate lenient="true">
             <fileset dir="./" includes="**/*.xml">
                 <exclude name=".idea/**"/>
@@ -124,7 +113,12 @@
 
 
     <target name="doc" depends="build">
-        <fileset dir="${build.dir}" id="files.to.process"/>
+        <echo message="***** DOC STARTED *****"/>
+
+        <fileset dir="${build.dir}" id="files.to.process">
+                <include name="**/*"/>
+        </fileset>
+
         <for param="file">
             <path>
                 <fileset refid="files.to.process"/>
@@ -152,12 +146,9 @@
         <mkdir dir="${javadoc.dir}/javadoc"/>
         <javadoc destdir="${javadoc.dir}/javadoc">
             <classpath refid="classpath"/>
-            <!--            <classpath refid="test.classpath"/>-->
             <fileset dir="${src.dir}" includes="**/*.java"/>
         </javadoc>
-        <war destfile="${build.dir}/${ant.project.name}.war" update="true">
-            <fileset dir="${javadoc.dir}"/>
-        </war>
+        <echo message="***** DOC COMPLETED *****"/>
     </target>
 
     <target name="team">
@@ -209,7 +200,7 @@
         </exec>
     </target>
 
-    <target name="diff">
+       <target name="diff">
         <echo message="***** DIFF TARGET STARTED *****"/>
 
         <exec executable="git" outputproperty="diff.output">
@@ -257,76 +248,28 @@
                     <fileset dir="${junit.report.dir}" includes="TEST-*.xml" />
                     <report todir="${junit.report.dir}" />
                 </junitreport>
-
-                <move todir="${git.dir}">
-                    <fileset dir="${junit.report.dir}" includes="TESTS-*.xml"/>
-                </move>
-
                 <exec executable="git">
                     <arg value="add" />
-                    <arg value="${git.dir}/*" />
+                    <arg value="${junit.report.dir}/TESTS-*.xml" />
                 </exec>
                 <exec executable="git">
                     <arg value="update" />
-                    <arg value="${git.dir}"/>
+                    <arg value="${junit.report.dir}/TESTS-*.xml"/>
                 </exec>
                 <exec executable="git">
                     <arg value="commit" />
-                    <arg value="${git.dir}"/>
+                    <arg value="${junit.report.dir}/TESTS-*.xml"/>
                     <arg value="-m" />
-                    <arg value="Update report" />
+                    <arg value="report after tests" />
                 </exec>
             </then>
             <else>
-                <echo message="Tests were not successful. Skipping report generation." />
+                <echo message="Failed tests" />
             </else>
         </if>
         <echo message="***** REPORT COMPLETED *****"/>
     </target>
 
-    <target name="history">
-        <echo message="***** HISTORY TARGET STARTED *****"/>
 
-        <!-- Определяем переменные -->
-        <property name="revision" value="HEAD"/>
-        <property name="prev_revision" value=""/>
-
-        <!-- Проверяем, удалось ли скомпилировать текущую версию -->
-        <condition property="compile.success">
-            <available file="${classes.dir}" type="dir"/>
-        </condition>
-
-        <!-- Если компиляция не удалась, итерируемся по предыдущим ревизиям -->
-        <if>
-            <not>
-                <isset property="compile.success"/>
-            </not>
-            <then>
-                <!-- Ограничиваем число итераций цикла -->
-                <for list="1,2,3,4,5" param="iteration">
-                    <sequential>
-                        <!-- Получаем предыдущую ревизию из репозитория git -->
-                        <exec executable="git" outputproperty="prev_revision">
-                            <arg value="rev-parse"/>
-                            <arg value="${revision}^"/>
-                        </exec>
-                    </sequential>
-                </for>
-            </then>
-        </if>
-
-        <!-- Если удалось скомпилировать проект, сохраняем информацию о предыдущей рабочей ревизии -->
-        <if>
-            <isset property="compile.success"/>
-            <then>
-                <echo message="Previous working revision: curr ${prev_revision}"/>
-            </then>
-            <else>
-                <echo message="No previous working revision found"/>
-            </else>
-        </if>
-
-        <echo message="***** HISTORY TARGET COMPLETED *****"/>
-    </target>
 
 </project>
