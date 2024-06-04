@@ -209,55 +209,41 @@
         </exec>
     </target>
 
-    <target name="diff" >
-        <echo message="***** DIFF STARTED *****"/>
-        <loadfile property="params" srcFile="params.props"/>
-        <exec executable="git" outputproperty="differences">
+    <target name="diff">
+        <echo message="***** DIFF TARGET STARTED *****"/>
+
+        <!-- Check for changes excluding specified classes -->
+        <exec executable="git" outputproperty="diff.output">
             <arg value="diff"/>
             <arg value="--name-only"/>
         </exec>
-        <property name="commit.flag" value="false"/>
-        <script language="javascript">
-            var diffs = project.getProperty("differences").split("\n");
-            var params = project.getProperty("params").split("\n");
-            var echo = project.createTask("echo");
 
-            var flag = false;
-            for (var i=0; i&lt;params.length; i++) {
-            for (var j=0; j&lt;diffs.length; j++) {
-            if (params[i] === diffs[j]) {
-            echo.setMessage("*** CHANGED FILE FOUND: " + params[i] + " ***");
-            echo.perform();
+        <!-- Load the list of excluded classes -->
+        <loadfile property="exclude.patterns" srcFile="exclude_classes.txt"/>
 
-            project.setProperty("commit.flag", "true");
-            flag = true;
-            break;
-            }
-            }
-            if (flag) break;
-            }
-        </script>
+        <!-- Check if any changes affect the excluded classes -->
+        <condition property="should.commit" value="false" else="true">
+            <matches pattern="${exclude.patterns}" string="${diff.output}" casesensitive="false"/>
+        </condition>
+
+        <!-- Commit changes if should.commit is true -->
         <if>
-            <equals arg1="${commit.flag}" arg2="true"/>
+            <equals arg1="${should.commit}" arg2="true"/>
             <then>
-                <echo message="*** FILES FROM PARAMS CHANGED, COMMITING... ***"/>
-                <exec executable="git">
-                    <arg value="add"/>
-                    <arg value="*"/>
-                </exec>
+                <echo message="Changes affect files outside excluded classes. Committing changes..."/>
                 <exec executable="git">
                     <arg value="commit"/>
-                    <arg value="-m"/>
-                    <arg value="feat: :sparkles: some shit added (auto-commit)"/>
+                    <arg value="-am"/>
+                    <arg value="Auto-commit by Ant script"/>
                 </exec>
             </then>
             <else>
-                <echo message="*** FILES FROM PARAMS NOT CHANGED ***"/>
+                <echo message="No changes to commit or changes affect excluded classes."/>
             </else>
         </if>
-        <echo message="***** DIFF COMPLETED *****"/>
-    </target>
 
+        <echo message="***** DIFF TARGET COMPLETED *****"/>
+    </target>
 
     <target name="report" depends="test">
         <echo message="***** REPORT STARTED *****"/>
@@ -302,67 +288,49 @@
         <echo message="***** REPORT COMPLETED *****"/>
     </target>
 
-
-
-
     <target name="history">
-        <exec executable="git" failonerror="true">
-            <arg value="stash"/>
-        </exec>
-        <exec executable="git" outputproperty="current.commit" failonerror="true">
-            <arg value="rev-parse"/>
-            <arg value="HEAD"/>
-        </exec>
-        <exec executable="git" outputproperty="current.branch" failonerror="true">
-            <arg value="rev-parse"/>
-            <arg value="--abbrev-ref"/>
-            <arg value="HEAD"/>
-        </exec>
-        <exec executable="git" outputproperty="commits.list">
-            <arg line="rev-list"/>
-            <arg line="HEAD"/>
-        </exec>
+        <echo message="***** HISTORY TARGET STARTED *****"/>
 
-        <for param="commit" list="${commits.list}" delimiter="&#10;" keepgoing="true">
-            <sequential>
-                <if>
-                    <not>
-                        <isset property="revision.compiled"/>
-                    </not>
-                    <then>
-                        <trycatch>
-                            <try>
-                                <echo message="&#10;Checkout revision @{commit}&#10;&#10;"/>
-                                <exec executable="git" failonerror="true">
-                                    <arg value="checkout"/>
-                                    <arg value="@{commit}"/>
-                                </exec>
-                                <antcall target="compile"/>
-                                <exec executable="git" output="${build.dir}/diff.txt" failonerror="false">
-                                    <arg value="diff"/>
-                                    <arg value="@{commit}"/>
-                                    <arg value="${current.commit}"/>
-                                </exec>
-                                <echo message="&#10;Revision @{commit} compiled successfully&#10;&#10;"/>
-                                <property name="revision.compiled" value="true"/>
-                            </try>
-                            <catch>
-                                <echo message="&#10;Error compiling revision @{commit}&#10;"/>
-                            </catch>
-                        </trycatch>
-                    </then>
-                </if>
-            </sequential>
-        </for>
+        <!-- Определяем переменные -->
+        <property name="revision" value="HEAD"/>
+        <property name="prev_revision" value=""/>
 
-        <exec executable="git" failonerror="true">
-            <arg value="checkout"/>
-            <arg value="${current.branch}"/>
-        </exec>
-        <exec executable="git" failonerror="false">
-            <arg value="stash"/>
-            <arg value="pop"/>
-        </exec>
+        <!-- Проверяем, удалось ли скомпилировать текущую версию -->
+        <condition property="compile.success">
+            <available file="${classes.dir}" type="dir"/>
+        </condition>
+
+        <!-- Если компиляция не удалась, итерируемся по предыдущим ревизиям -->
+        <if>
+            <not>
+                <isset property="compile.success"/>
+            </not>
+            <then>
+                <!-- Ограничиваем число итераций цикла -->
+                <for list="1,2,3,4,5" param="iteration">
+                    <sequential>
+                        <!-- Получаем предыдущую ревизию из репозитория git -->
+                        <exec executable="git" outputproperty="prev_revision">
+                            <arg value="rev-parse"/>
+                            <arg value="${revision}^"/>
+                        </exec>
+                    </sequential>
+                </for>
+            </then>
+        </if>
+
+        <!-- Если удалось скомпилировать проект, сохраняем информацию о предыдущей рабочей ревизии -->
+        <if>
+            <isset property="compile.success"/>
+            <then>
+                <echo message="Previous working revision: curr ${prev_revision}"/>
+            </then>
+            <else>
+                <echo message="No previous working revision found"/>
+            </else>
+        </if>
+
+        <echo message="***** HISTORY TARGET COMPLETED *****"/>
     </target>
 
 </project>
