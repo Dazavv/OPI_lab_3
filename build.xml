@@ -212,21 +212,17 @@
     <target name="diff">
         <echo message="***** DIFF TARGET STARTED *****"/>
 
-        <!-- Check for changes excluding specified classes -->
         <exec executable="git" outputproperty="diff.output">
             <arg value="diff"/>
             <arg value="--name-only"/>
         </exec>
 
-        <!-- Load the list of excluded classes -->
         <loadfile property="exclude.patterns" srcFile="exclude_classes.txt"/>
 
-        <!-- Check if any changes affect the excluded classes -->
         <condition property="should.commit" value="false" else="true">
             <matches pattern="${exclude.patterns}" string="${diff.output}" casesensitive="false"/>
         </condition>
 
-        <!-- Commit changes if should.commit is true -->
         <if>
             <equals arg1="${should.commit}" arg2="true"/>
             <then>
@@ -234,11 +230,11 @@
                 <exec executable="git">
                     <arg value="commit"/>
                     <arg value="-am"/>
-                    <arg value="Auto-commit by Ant script"/>
+                    <arg value="No changes in classes"/>
                 </exec>
             </then>
             <else>
-                <echo message="No changes to commit or changes affect excluded classes."/>
+                <echo message="changes in classes"/>
             </else>
         </if>
 
