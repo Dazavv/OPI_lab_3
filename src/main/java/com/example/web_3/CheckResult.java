@@ -13,7 +13,7 @@ public class CheckResult {
      * @param r радиус области
      * @return true, если точка находится внутри области, иначе false
      */
-    public boolean check float x, float y, float r){
+    public boolean check (float x, float y, float r){
         // квадрат
         if (x >= 0 && y >= 0 && x <= r && y <= r / 2) return true;
         // треугольник
