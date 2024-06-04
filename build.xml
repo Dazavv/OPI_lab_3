@@ -1,4 +1,4 @@
-<project name="web_3" default="build">
+﻿<project name="web_3" default="build">
     <property file="build.properties"/>
 
     <path id="classpath">
@@ -26,7 +26,6 @@
     <target name="compile" depends="clean">
         <echo message="***** COMPILE STARTED *****"/>
         <mkdir dir="${classes.dir}"/>
-        <mkdir dir="${test.classes.dir}"/>
         <javac srcdir="${src.dir}" destdir="${classes.dir}" classpathref="classpath" includeantruntime="false"/>
         <echo message="***** COMPILE COMPLETED *****"/>
     </target>
@@ -51,15 +50,6 @@
                 <attribute name="Main-Class" value="NoClass"/>
             </manifest>
         </jar>
-
-        <war destfile="${build.dir}/${ant.project.name}.war" webxml="${build.web.xml}">
-            <fileset dir="${build.dir}"/>
-            <manifest>
-                <attribute name="Created-By" value="Dasha"/>
-                <attribute name="Manifest-Version" value="1.0"/>
-                <attribute name="Main-Class" value="NoClass"/>
-            </manifest>
-        </war>
 
         <echo message="***** BUILD COMPLETED *****"/>
     </target>
@@ -93,7 +83,6 @@
 
     <target name="xml">
         <echo message="***** XML STARTED *****"/>
-        <echo>XML project files validation...</echo>
         <xmlvalidate lenient="true">
             <fileset dir="./" includes="**/*.xml">
                 <exclude name=".idea/**"/>
@@ -124,7 +113,12 @@
 
 
     <target name="doc" depends="build">
-        <fileset dir="${build.dir}" id="files.to.process"/>
+        <echo message="***** DOC STARTED *****"/>
+
+        <fileset dir="${build.dir}" id="files.to.process">
+                <include name="**/*"/>
+        </fileset>
+
         <for param="file">
             <path>
                 <fileset refid="files.to.process"/>
@@ -152,12 +146,9 @@
         <mkdir dir="${javadoc.dir}/javadoc"/>
         <javadoc destdir="${javadoc.dir}/javadoc">
             <classpath refid="classpath"/>
-            <!--            <classpath refid="test.classpath"/>-->
             <fileset dir="${src.dir}" includes="**/*.java"/>
         </javadoc>
-        <war destfile="${build.dir}/${ant.project.name}.war" update="true">
-            <fileset dir="${javadoc.dir}"/>
-        </war>
+        <echo message="***** DOC COMPLETED *****"/>
     </target>
 
     <target name="team">
@@ -209,53 +200,42 @@
         </exec>
     </target>
 
-    <target name="diff" >
-        <echo message="***** DIFF STARTED *****"/>
-        <loadfile property="params" srcFile="params.props"/>
-        <exec executable="git" outputproperty="differences">
+    <target name="diff">
+        <echo message="***** DIFF CHECK STARTED *****"/>
+
+        <!-- Получение списка измененных файлов -->
+        <exec executable="git" outputproperty="git.diff">
             <arg value="diff"/>
             <arg value="--name-only"/>
         </exec>
-        <property name="commit.flag" value="false"/>
-        <script language="javascript">
-            var diffs = project.getProperty("differences").split("\n");
-            var params = project.getProperty("params").split("\n");
-            var echo = project.createTask("echo");
 
-            var flag = false;
-            for (var i=0; i&lt;params.length; i++) {
-            for (var j=0; j&lt;diffs.length; j++) {
-            if (params[i] === diffs[j]) {
-            echo.setMessage("*** CHANGED FILE FOUND: " + params[i] + " ***");
-            echo.perform();
+        <!-- Сравнение измененных файлов с файлом параметров -->
+        <condition property="should.commit" value="true" else="false">
+            <matches pattern="${params.classes}" string="${git.diff}" casesensitive="true" negate="true"/>
+        </condition>
 
-            project.setProperty("commit.flag", "true");
-            flag = true;
-            break;
-            }
-            }
-            if (flag) break;
-            }
-        </script>
+        <!-- Выполнение коммита, если изменения допустимы -->
         <if>
-            <equals arg1="${commit.flag}" arg2="true"/>
+            <condition>
+                <isset property="should.commit"/>
+            </condition>
             <then>
-                <echo message="*** FILES FROM PARAMS CHANGED, COMMITING... ***"/>
                 <exec executable="git">
                     <arg value="add"/>
-                    <arg value="*"/>
+                    <arg value="."/>
                 </exec>
                 <exec executable="git">
                     <arg value="commit"/>
                     <arg value="-m"/>
-                    <arg value="feat: :sparkles: some shit added (auto-commit)"/>
+                    <arg value="Auto-commit by Ant"/>
                 </exec>
             </then>
             <else>
-                <echo message="*** FILES FROM PARAMS NOT CHANGED ***"/>
+                <echo message="Изменения затрагивают защищенные классы. Коммит не выполнен."/>
             </else>
         </if>
-        <echo message="***** DIFF COMPLETED *****"/>
+
+        <echo message="***** DIFF CHECK COMPLETED *****"/>
     </target>
 
 
@@ -275,35 +255,29 @@
                     <fileset dir="${junit.report.dir}" includes="TEST-*.xml" />
                     <report todir="${junit.report.dir}" />
                 </junitreport>
-
-                <move todir="${git.dir}">
-                    <fileset dir="${junit.report.dir}" includes="TESTS-*.xml"/>
-                </move>
-
                 <exec executable="git">
                     <arg value="add" />
-                    <arg value="${git.dir}/*" />
+                    <arg value="${junit.report.dir}/TESTS-*.xml" />
                 </exec>
                 <exec executable="git">
                     <arg value="update" />
-                    <arg value="${git.dir}"/>
+                    <arg value="${junit.report.dir}/TESTS-*.xml"/>
                 </exec>
                 <exec executable="git">
                     <arg value="commit" />
-                    <arg value="${git.dir}"/>
+                    <arg value="${junit.report.dir}/TESTS-*.xml"/>
                     <arg value="-m" />
-                    <arg value="Update report" />
+                    <arg value="report after tests" />
                 </exec>
             </then>
             <else>
-                <echo message="Tests were not successful. Skipping report generation." />
+                <echo message="Failed tests" />
             </else>
         </if>
         <echo message="***** REPORT COMPLETED *****"/>
     </target>
 
-
-
+    
 
     <target name="history">
         <exec executable="git" failonerror="true">
