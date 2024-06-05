@@ -1,0 +1,4 @@
+com/example/web_3/CheckResult.java
+com/example/web_3/Result.java
+com/example/web_3/ResultCDI.java
+com/example/web_3/ResultEJB.java

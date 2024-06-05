@@ -26,6 +26,7 @@
     <target name="compile" depends="clean">
         <echo message="***** COMPILE STARTED *****"/>
         <mkdir dir="${classes.dir}"/>
+        <mkdir dir="${test.classes.dir}"/>
         <javac srcdir="${src.dir}" destdir="${classes.dir}" classpathref="classpath" includeantruntime="false"/>
         <echo message="***** COMPILE COMPLETED *****"/>
     </target>
@@ -50,6 +51,15 @@
                 <attribute name="Main-Class" value="NoClass"/>
             </manifest>
         </jar>
+
+        <war destfile="${build.dir}/${ant.project.name}.war" webxml="${build.web.xml}">
+            <fileset dir="${build.dir}"/>
+            <manifest>
+                <attribute name="Created-By" value="Dasha"/>
+                <attribute name="Manifest-Version" value="1.0"/>
+                <attribute name="Main-Class" value="NoClass"/>
+            </manifest>
+        </war>
 
         <echo message="***** BUILD COMPLETED *****"/>
     </target>
@@ -83,6 +93,7 @@
 
     <target name="xml">
         <echo message="***** XML STARTED *****"/>
+        <echo>XML project files validation...</echo>
         <xmlvalidate lenient="true">
             <fileset dir="./" includes="**/*.xml">
                 <exclude name=".idea/**"/>
@@ -113,12 +124,7 @@
 
 
     <target name="doc" depends="build">
-        <echo message="***** DOC STARTED *****"/>
-
-        <fileset dir="${build.dir}" id="files.to.process">
-                <include name="**/*"/>
-        </fileset>
-
+        <fileset dir="${build.dir}" id="files.to.process"/>
         <for param="file">
             <path>
                 <fileset refid="files.to.process"/>
@@ -146,9 +152,12 @@
         <mkdir dir="${javadoc.dir}/javadoc"/>
         <javadoc destdir="${javadoc.dir}/javadoc">
             <classpath refid="classpath"/>
+            <!--            <classpath refid="test.classpath"/>-->
             <fileset dir="${src.dir}" includes="**/*.java"/>
         </javadoc>
-        <echo message="***** DOC COMPLETED *****"/>
+        <war destfile="${build.dir}/${ant.project.name}.war" update="true">
+            <fileset dir="${javadoc.dir}"/>
+        </war>
     </target>
 
     <target name="team">
@@ -201,43 +210,37 @@
     </target>
 
     <target name="diff">
-        <echo message="***** DIFF CHECK STARTED *****"/>
+        <echo message="***** DIFF TARGET STARTED *****"/>
 
-        <!-- Получение списка измененных файлов -->
-        <exec executable="git" outputproperty="git.diff">
+        <exec executable="git" outputproperty="diff.output">
             <arg value="diff"/>
             <arg value="--name-only"/>
         </exec>
 
-        <!-- Сравнение измененных файлов с файлом параметров -->
+        <loadfile property="exclude.patterns" srcFile="exclude_classes.txt"/>
+
         <condition property="should.commit" value="true" else="false">
-            <matches pattern="${params.classes}" string="${git.diff}" casesensitive="true" negate="true"/>
+            <not>
+                <matches pattern="${exclude.patterns}" string="${diff.output}" casesensitive="false"/>
+            </not>
         </condition>
 
-        <!-- Выполнение коммита, если изменения допустимы -->
         <if>
-            <condition>
-                <isset property="should.commit"/>
-            </condition>
+            <equals arg1="${should.commit}" arg2="true"/>
             <then>
                 <exec executable="git">
-                    <arg value="add"/>
-                    <arg value="."/>
-                </exec>
-                <exec executable="git">
                     <arg value="commit"/>
-                    <arg value="-m"/>
-                    <arg value="Auto-commit by Ant"/>
+                    <arg value="-am"/>
+                    <arg value="no changes in exclude_classes.txt"/>
                 </exec>
             </then>
             <else>
-                <echo message="Изменения затрагивают защищенные классы. Коммит не выполнен."/>
+                <echo message="changes in classes"/>
             </else>
         </if>
 
-        <echo message="***** DIFF CHECK COMPLETED *****"/>
+        <echo message="***** DIFF TARGET COMPLETED *****"/>
     </target>
-
 
     <target name="report" depends="test">
         <echo message="***** REPORT STARTED *****"/>
@@ -255,88 +258,122 @@
                     <fileset dir="${junit.report.dir}" includes="TEST-*.xml" />
                     <report todir="${junit.report.dir}" />
                 </junitreport>
+
+                <move todir="${git.dir}">
+                    <fileset dir="${junit.report.dir}" includes="TESTS-*.xml"/>
+                </move>
+
                 <exec executable="git">
                     <arg value="add" />
-                    <arg value="${junit.report.dir}/TESTS-*.xml" />
+                    <arg value="${git.dir}/*" />
                 </exec>
                 <exec executable="git">
                     <arg value="update" />
-                    <arg value="${junit.report.dir}/TESTS-*.xml"/>
+                    <arg value="${git.dir}"/>
                 </exec>
                 <exec executable="git">
                     <arg value="commit" />
-                    <arg value="${junit.report.dir}/TESTS-*.xml"/>
+                    <arg value="${git.dir}"/>
                     <arg value="-m" />
-                    <arg value="report after tests" />
+                    <arg value="Update report" />
                 </exec>
             </then>
             <else>
-                <echo message="Failed tests" />
+                <echo message="Tests were not successful. Skipping report generation." />
             </else>
         </if>
         <echo message="***** REPORT COMPLETED *****"/>
     </target>
 
-    
-
     <target name="history">
-        <exec executable="git" failonerror="true">
-            <arg value="stash"/>
-        </exec>
-        <exec executable="git" outputproperty="current.commit" failonerror="true">
-            <arg value="rev-parse"/>
-            <arg value="HEAD"/>
-        </exec>
-        <exec executable="git" outputproperty="current.branch" failonerror="true">
-            <arg value="rev-parse"/>
-            <arg value="--abbrev-ref"/>
-            <arg value="HEAD"/>
-        </exec>
-        <exec executable="git" outputproperty="commits.list">
-            <arg line="rev-list"/>
-            <arg line="HEAD"/>
-        </exec>
+        <echo message="***** HISTORY TARGET STARTED *****"/>
 
-        <for param="commit" list="${commits.list}" delimiter="&#10;" keepgoing="true">
+        <!-- Определяем начальные переменные -->
+        <property name="revision" value="HEAD"/>
+        <property name="prev_revision" value=""/>
+        <property name="compile.success" value="false"/>
+        <property name="max_attempts" value="100"/>
+
+        <!-- Ограничиваем число итераций цикла -->
+        <for list="1,2,3,4,5" param="iteration">
             <sequential>
+                <!-- Компиляция проекта -->
+                <antcall target="compile"/>
+                <condition property="compile.success">
+                    <available file="${classes.dir}" type="dir"/>
+                </condition>
+
+                <!-- Проверяем, завершить ли цикл -->
+                <if>
+                    <isset property="compile.success"/>
+                    <then>
+                        <echo message="Compilation succeeded at revision ${revision}"/>
+                        <property name="stop.iteration" value="true"/>
+                    </then>
+                </if>
+
+                <!-- Если не удалась, загружаем предыдущую ревизию -->
                 <if>
                     <not>
-                        <isset property="revision.compiled"/>
+                        <isset property="stop.iteration"/>
                     </not>
                     <then>
-                        <trycatch>
-                            <try>
-                                <echo message="&#10;Checkout revision @{commit}&#10;&#10;"/>
-                                <exec executable="git" failonerror="true">
+                        <exec executable="git" outputproperty="prev_revision">
+                            <arg value="rev-parse"/>
+                            <arg value="${revision}^"/>
+                        </exec>
+
+                        <!-- Проверяем, что не достигли самой первой ревизии -->
+                        <condition property="first_revision_reached">
+                            <equals arg1="${prev_revision}" arg2=""/>
+                        </condition>
+                        <if>
+                            <isset property="first_revision_reached"/>
+                            <then>
+                                <echo message="Reached the first revision without successful compilation"/>
+                                <property name="stop.iteration" value="true"/>
+                            </then>
+                            <else>
+                                <!-- Откатываемся на предыдущую ревизию -->
+                                <exec executable="git">
                                     <arg value="checkout"/>
-                                    <arg value="@{commit}"/>
+                                    <arg value="${prev_revision}"/>
                                 </exec>
-                                <antcall target="compile"/>
-                                <exec executable="git" output="${build.dir}/diff.txt" failonerror="false">
-                                    <arg value="diff"/>
-                                    <arg value="@{commit}"/>
-                                    <arg value="${current.commit}"/>
-                                </exec>
-                                <echo message="&#10;Revision @{commit} compiled successfully&#10;&#10;"/>
-                                <property name="revision.compiled" value="true"/>
-                            </try>
-                            <catch>
-                                <echo message="&#10;Error compiling revision @{commit}&#10;"/>
-                            </catch>
-                        </trycatch>
+                                <!-- Обновляем текущую ревизию -->
+                                <property name="revision" value="${prev_revision}"/>
+                            </else>
+                        </if>
+                    </then>
+                </if>
+
+                <!-- Проверка завершения цикла -->
+                <if>
+                    <isset property="stop.iteration"/>
+                    <then>
+                        <echo message="Stopping iteration at attempt ${iteration}"/>
+                        <property name="iteration" value="5"/>
                     </then>
                 </if>
             </sequential>
         </for>
 
-        <exec executable="git" failonerror="true">
-            <arg value="checkout"/>
-            <arg value="${current.branch}"/>
-        </exec>
-        <exec executable="git" failonerror="false">
-            <arg value="stash"/>
-            <arg value="pop"/>
-        </exec>
+        <!-- Если компиляция удалась, сохраняем результат diff -->
+        <if>
+            <isset property="compile.success"/>
+            <then>
+                <exec executable="git" outputproperty="diff.output">
+                    <arg value="diff"/>
+                    <arg value="${revision}^"/>
+                    <arg value="${revision}"/>
+                </exec>
+                <echo message="${diff.output}" file="diff_result.txt"/>
+            </then>
+            <else>
+                <echo message="No working revision found after ${max_attempts} attempts"/>
+            </else>
+        </if>
+
+        <echo message="***** HISTORY TARGET COMPLETED *****"/>
     </target>
 
 </project>
