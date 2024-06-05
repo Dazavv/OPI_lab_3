@@ -298,7 +298,6 @@
             <arg value="stash"/>
         </exec>
 
-        <antcall ></antcall>
 
         <property name="revision" value="HEAD"/>
         <property name="prev_revision" value=""/>
