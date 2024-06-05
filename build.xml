@@ -158,55 +158,61 @@
         <war destfile="${build.dir}/${ant.project.name}.war" update="true">
             <fileset dir="${javadoc.dir}"/>
         </war>
-    </target>
 
+    </target>
     <target name="team">
-        <exec executable="git" failonerror="true">
+
+        <echo message="***** TEAM TARGET STARTED *****"/>
+
+        <!-- Create a temporary directory for previous revisions -->
+        <mkdir dir="git"/>
+
+        <!-- Stash local changes -->
+        <exec executable="git">
             <arg value="stash"/>
         </exec>
-        <exec executable="git" outputproperty="current.commit" failonerror="true">
-            <arg value="rev-parse"/>
-            <arg value="HEAD"/>
-        </exec>
-        <exec executable="git" outputproperty="current.branch" failonerror="true">
-            <arg value="rev-parse"/>
-            <arg value="--abbrev-ref"/>
-            <arg value="HEAD"/>
-        </exec>
-        <property name="revision1" value="${current.commit}~1"/>
-        <property name="revision2" value="${current.commit}~2"/>
-
-        <exec executable="git" failonerror="true">
+    
+        <!-- Checkout previous revision -->
+        <exec executable="git">
             <arg value="checkout"/>
-            <arg value="${revision1}"/>
+            <arg value="HEAD^1"/>
         </exec>
-        <antcall target="build">
-            <param name="war.file" value="${build.dir}/${ant.project.name}_${revision1}.war"/>
-        </antcall>
 
-        <exec executable="git" failonerror="true">
+        <!-- Build the previous revision -->
+        <ant target="build"/>
+        <copy file="${build.dir}/${ant.project.name}.jar" tofile="git/${ant.project.name}-prev1.jar"/>
+
+        <!-- Checkout second previous revision -->
+        <exec executable="git">
             <arg value="checkout"/>
-            <arg value="${revision2}"/>
+            <arg value="HEAD^1"/>
         </exec>
-        <antcall target="build">
-            <param name="war.file" value="${build.dir}/${ant.project.name}_${revision2}.war"/>
-        </antcall>
 
-        <zip destfile="${build.dir}/prev-revisions.zip">
-            <fileset dir="${build.dir}">
-                <include name="${ant.project.name}_${revision1}.war"/>
-                <include name="${ant.project.name}_${revision2}.war"/>
-            </fileset>
-        </zip>
+        <!-- Build the second previous revision -->
+        <ant target="build"/>
+        <copy file="${build.dir}/${ant.project.name}.jar" tofile="git/${ant.project.name}-prev2.jar"/>
 
-        <exec executable="git" failonerror="true">
+        <!-- Checkout back to the main branch -->
+        <exec executable="git">
             <arg value="checkout"/>
-            <arg value="${current.branch}"/>
+            <arg value="master"/>
         </exec>
-        <exec executable="git" failonerror="false">
+
+        <!-- Apply stashed changes -->
+        <exec executable="git">
             <arg value="stash"/>
             <arg value="pop"/>
         </exec>
+
+        <!-- Create a zip file with the two previous builds -->
+        <zip destfile="${build.dir}/previous_builds.zip">
+            <fileset dir="git" includes="*.jar"/>
+        </zip>
+
+        <!-- Clean up the temporary directory -->
+<!--        <delete dir="git"/>-->
+
+        <echo message="***** TEAM TARGET COMPLETED *****"/>
     </target>
 
     <target name="diff">
@@ -288,6 +294,12 @@
     <target name="history">
         <echo message="***** HISTORY TARGET STARTED *****"/>
 
+        <exec executable="git" failonerror="true">
+            <arg value="stash"/>
+        </exec>
+
+        <antcall ></antcall>
+
         <property name="revision" value="HEAD"/>
         <property name="prev_revision" value=""/>
 
@@ -339,6 +351,15 @@
                 <echo message="working revision: ${prev_revision}"/>
             </then>
         </if>
+
+        <exec executable="git" failonerror="true">
+            <arg value="checkout"/>
+            <arg value="${current.branch}"/>
+        </exec>
+        <exec executable="git" failonerror="false">
+            <arg value="stash"/>
+            <arg value="pop"/>
+        </exec>
 
         <echo message="***** HISTORY TARGET COMPLETED *****"/>
     </target>
