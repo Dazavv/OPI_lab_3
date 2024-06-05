@@ -350,7 +350,6 @@
                 <echo message="working revision: ${prev_revision}"/>
             </then>
         </if>
-
         <exec executable="git" failonerror="true">
             <arg value="checkout"/>
         </exec>
