@@ -353,7 +353,6 @@
 
         <exec executable="git" failonerror="true">
             <arg value="checkout"/>
-            <arg value="${current.branch}"/>
         </exec>
         <exec executable="git" failonerror="false">
             <arg value="stash"/>
