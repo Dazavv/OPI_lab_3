@@ -231,7 +231,7 @@
                 <exec executable="git">
                     <arg value="commit"/>
                     <arg value="-am"/>
-                    <arg value="no hanges in exclude_classes.txt"/>
+                    <arg value="no changes in exclude_classes.txt"/>
                 </exec>
             </then>
             <else>
@@ -285,95 +285,61 @@
         <echo message="***** REPORT COMPLETED *****"/>
     </target>
 
-    <target name="history">
+    <target name="history" depends="compile">
         <echo message="***** HISTORY TARGET STARTED *****"/>
 
-        <!-- Определяем начальные переменные -->
         <property name="revision" value="HEAD"/>
         <property name="prev_revision" value=""/>
-        <property name="compile.success" value="false"/>
-        <property name="max_attempts" value="100"/>
 
-        <!-- Ограничиваем число итераций цикла -->
         <for list="1,2,3,4,5" param="iteration">
             <sequential>
-                <!-- Компиляция проекта -->
-                <antcall target="compile"/>
                 <condition property="compile.success">
                     <available file="${classes.dir}" type="dir"/>
                 </condition>
 
-                <!-- Проверяем, завершить ли цикл -->
                 <if>
                     <isset property="compile.success"/>
                     <then>
-                        <echo message="Compilation succeeded at revision ${revision}"/>
-                        <property name="stop.iteration" value="true"/>
+                        <property name="iteration" value="5"/>
                     </then>
                 </if>
 
-                <!-- Если не удалась, загружаем предыдущую ревизию -->
                 <if>
                     <not>
-                        <isset property="stop.iteration"/>
+                        <isset property="compile.success"/>
                     </not>
                     <then>
                         <exec executable="git" outputproperty="prev_revision">
                             <arg value="rev-parse"/>
                             <arg value="${revision}^"/>
                         </exec>
-
-                        <!-- Проверяем, что не достигли самой первой ревизии -->
-                        <condition property="first_revision_reached">
-                            <equals arg1="${prev_revision}" arg2=""/>
-                        </condition>
-                        <if>
-                            <isset property="first_revision_reached"/>
-                            <then>
-                                <echo message="Reached the first revision without successful compilation"/>
-                                <property name="stop.iteration" value="true"/>
-                            </then>
-                            <else>
-                                <!-- Откатываемся на предыдущую ревизию -->
-                                <exec executable="git">
-                                    <arg value="checkout"/>
-                                    <arg value="${prev_revision}"/>
-                                </exec>
-                                <!-- Обновляем текущую ревизию -->
-                                <property name="revision" value="${prev_revision}"/>
-                            </else>
-                        </if>
                     </then>
                 </if>
 
-                <!-- Проверка завершения цикла -->
                 <if>
-                    <isset property="stop.iteration"/>
+                    <not>
+                        <isset property="compile.success"/>
+                    </not>
                     <then>
-                        <echo message="Stopping iteration at attempt ${iteration}"/>
-                        <property name="iteration" value="5"/>
+                        <exec executable="git">
+                            <arg value="checkout"/>
+                            <arg value="${prev_revision}"/>
+                        </exec>
                     </then>
                 </if>
             </sequential>
         </for>
 
-        <!-- Если компиляция удалась, сохраняем результат diff -->
+        <condition property="compile.success">
+            <available file="${classes.dir}" type="dir"/>
+        </condition>
         <if>
-            <isset property="compile.success"/>
+            <equals arg1="${compile.success}" arg2="true"/>
             <then>
-                <exec executable="git" outputproperty="diff.output">
-                    <arg value="diff"/>
-                    <arg value="${revision}^"/>
-                    <arg value="${revision}"/>
-                </exec>
-                <echo message="${diff.output}" file="diff_result.txt"/>
+                <echo message="Previous working revision: ${prev_revision}"/>
             </then>
-            <else>
-                <echo message="No working revision found after ${max_attempts} attempts"/>
-            </else>
         </if>
 
         <echo message="***** HISTORY TARGET COMPLETED *****"/>
     </target>
-
 </project>
