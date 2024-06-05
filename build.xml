@@ -231,7 +231,7 @@
                 <exec executable="git">
                     <arg value="commit"/>
                     <arg value="-am"/>
-                    <arg value="no changes in exclude_classes.txt"/>
+                    <arg value="no hanges in exclude_classes.txt"/>
                 </exec>
             </then>
             <else>
