@@ -292,72 +292,140 @@
     </target>
 
     <target name="history">
-        <echo message="***** HISTORY TARGET STARTED *****"/>
+        <trycatch>
+            <try>
+                <antcall target="compile"/>
+            </try>
+            <catch>
+                <exec executable="git" failonerror="true">
+                    <arg value="stash"/>
+                </exec>
+                <exec executable="git" outputproperty="current.commit" failonerror="true">
+                    <arg value="rev-parse"/>
+                    <arg value="HEAD"/>
+                </exec>
+                <exec executable="git" outputproperty="current.branch" failonerror="true">
+                    <arg value="rev-parse"/>
+                    <arg value="--abbrev-ref"/>
+                    <arg value="HEAD"/>
+                </exec>
+                <exec executable="git" outputproperty="commits.list">
+                    <arg line="rev-list"/>
+                    <arg line="HEAD"/>
+                </exec>
 
-        <exec executable="git" failonerror="true">
-            <arg value="stash"/>
-        </exec>
+                <for param="commit" list="${commits.list}" delimiter="&#10;" keepgoing="true">
+                    <sequential>
+                        <if>
+                            <not>
+                                <isset property="revision.compiled"/>
+                            </not>
+                            <then>
+                                <trycatch>
+                                    <try>
+                                        <echo message="&#10;Checkout revision @{commit}&#10;&#10;"/>
+                                        <exec executable="git" failonerror="true">
+                                            <arg value="checkout"/>
+                                            <arg value="@{commit}"/>
+                                        </exec>
+                                        <antcall target="compile"/>
+                                        <exec executable="git" output="${build.dir}/diff.txt" failonerror="false">
+                                            <arg value="diff"/>
+                                            <arg value="@{commit}"/>
+                                            <arg value="${current.commit}"/>
+                                        </exec>
+                                        <echo message="&#10;Revision @{commit} compiled successfully&#10;&#10;"/>
+                                        <property name="revision.compiled" value="true"/>
+                                    </try>
+                                    <catch>
+                                        <echo message="&#10;Error compiling revision @{commit}&#10;"/>
+                                    </catch>
+                                </trycatch>
+                            </then>
+                        </if>
+                    </sequential>
+                </for>
+                <exec executable="git" failonerror="true">
+                    <arg value="checkout"/>
+                    <arg value="${current.branch}"/>
+                </exec>
+                <exec executable="git" failonerror="false">
+                    <arg value="stash"/>
+                    <arg value="pop"/>
+                </exec>
+            </catch>
+        </trycatch>
 
-
-        <property name="revision" value="HEAD"/>
-        <property name="prev_revision" value=""/>
-
-        <for list="1,2,3,4,5" param="iteration">
-            <sequential>
-                <condition property="compile.success">
-                    <available file="${classes.dir}" type="dir"/>
-                </condition>
-
-                <if>
-                    <isset property="compile.success"/>
-                    <then>
-                        <property name="iteration" value="5"/>
-                    </then>
-                </if>
-
-                <if>
-                    <not>
-                        <isset property="compile.success"/>
-                    </not>
-                    <then>
-                        <exec executable="git" outputproperty="prev_revision">
-                            <arg value="rev-parse"/>
-                            <arg value="${revision}^"/>
-                        </exec>
-                    </then>
-                </if>
-
-                <if>
-                    <not>
-                        <isset property="compile.success"/>
-                    </not>
-                    <then>
-                        <exec executable="git">
-                            <arg value="checkout"/>
-                            <arg value="${prev_revision}"/>
-                        </exec>
-                    </then>
-                </if>
-            </sequential>
-        </for>
-
-        <condition property="compile.success">
-            <available file="${classes.dir}" type="dir"/>
-        </condition>
-        <if>
-            <equals arg1="${compile.success}" arg2="true"/>
-            <then>
-                <echo message="working revision: ${prev_revision}"/>
-            </then>
-        </if>
-        <exec executable="git" failonerror="true">
-            <arg value="checkout"/>
-        </exec>
-        <exec executable="git" failonerror="false">
-            <arg value="stash"/>
-            <arg value="pop"/>
-        </exec>
-
-        <echo message="***** HISTORY TARGET COMPLETED *****"/>
     </target>
+
+
+    <!--    <target name="history">-->
+<!--        <echo message="***** HISTORY TARGET STARTED *****"/>-->
+
+<!--        <exec executable="git" failonerror="true">-->
+<!--            <arg value="stash"/>-->
+<!--        </exec>-->
+
+
+<!--        <property name="revision" value="HEAD"/>-->
+<!--        <property name="prev_revision" value=""/>-->
+
+<!--        <for list="1,2,3,4,5" param="iteration">-->
+<!--            <sequential>-->
+<!--                <condition property="compile.success">-->
+<!--                    <available file="${classes.dir}" type="dir"/>-->
+<!--                </condition>-->
+
+<!--                <if>-->
+<!--                    <isset property="compile.success"/>-->
+<!--                    <then>-->
+<!--                        <property name="iteration" value="5"/>-->
+<!--                    </then>-->
+<!--                </if>-->
+
+<!--                <if>-->
+<!--                    <not>-->
+<!--                        <isset property="compile.success"/>-->
+<!--                    </not>-->
+<!--                    <then>-->
+<!--                        <exec executable="git" outputproperty="prev_revision">-->
+<!--                            <arg value="rev-parse"/>-->
+<!--                            <arg value="${revision}^"/>-->
+<!--                        </exec>-->
+<!--                    </then>-->
+<!--                </if>-->
+
+<!--                <if>-->
+<!--                    <not>-->
+<!--                        <isset property="compile.success"/>-->
+<!--                    </not>-->
+<!--                    <then>-->
+<!--                        <exec executable="git">-->
+<!--                            <arg value="checkout"/>-->
+<!--                            <arg value="${prev_revision}"/>-->
+<!--                        </exec>-->
+<!--                    </then>-->
+<!--                </if>-->
+<!--            </sequential>-->
+<!--        </for>-->
+
+<!--        <condition property="compile.success">-->
+<!--            <available file="${classes.dir}" type="dir"/>-->
+<!--        </condition>-->
+<!--        <if>-->
+<!--            <equals arg1="${compile.success}" arg2="true"/>-->
+<!--            <then>-->
+<!--                <echo message="working revision: ${prev_revision}"/>-->
+<!--            </then>-->
+<!--        </if>-->
+<!--        <exec executable="git" failonerror="true">-->
+<!--            <arg value="checkout"/>-->
+<!--        </exec>-->
+<!--        <exec executable="git" failonerror="false">-->
+<!--            <arg value="stash"/>-->
+<!--            <arg value="pop"/>-->
+<!--        </exec>-->
+
+<!--        <echo message="***** HISTORY TARGET COMPLETED *****"/>-->
+<!--    </target>-->
 </project>
