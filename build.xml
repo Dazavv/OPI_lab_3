@@ -285,7 +285,7 @@
         <echo message="***** REPORT COMPLETED *****"/>
     </target>
 
-    <target name="history" depends="compile">
+    <target name="history">
         <echo message="***** HISTORY TARGET STARTED *****"/>
 
         <property name="revision" value="HEAD"/>
@@ -336,7 +336,7 @@
         <if>
             <equals arg1="${compile.success}" arg2="true"/>
             <then>
-                <echo message="Previous working revision: ${prev_revision}"/>
+                <echo message="working revision: ${prev_revision}"/>
             </then>
         </if>
 
